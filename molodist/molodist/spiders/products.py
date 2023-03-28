@@ -1,6 +1,11 @@
 import scrapy
 import re
 
+from itemloaders import ItemLoader
+from itemloaders.processors import TakeFirst, MapCompose, Join
+
+from molodist.items import MolodistItem
+
 
 class ProductsSpider(scrapy.Spider):
     name = "products"
@@ -16,11 +21,10 @@ class ProductsSpider(scrapy.Spider):
             yield response.follow(next_page, self.parse)
 
     def parse_product(self, response, *kwargs):
-        price_numbers = re.findall('\d+', response.css('span.regular-price::text').get())
-        re_desc = re.sub("\s+", ' ', response.css('div.row.product-short-description-block p::text').get())
-        target = {
-            "title": response.css('div.products-title h1::text').get().strip(),
-            "price": "".join(price_numbers),
-            "description": "".join(re_desc)
-        }
-        yield target
+        loader = ItemLoader(item=MolodistItem(), selector=response)
+        loader.default_output_processor = TakeFirst()
+        price = re.findall('\d+', response.css('span.regular-price::text').get())
+        loader.add_css("title", "div.products-title h1::text", MapCompose(str.strip))
+        loader.add_value("price", price, Join(''))
+        loader.add_css("description", "div.row.product-short-description-block p::text", Join(' '), MapCompose(str.strip))
+        yield loader.load_item()
