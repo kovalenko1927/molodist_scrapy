@@ -1,5 +1,9 @@
 import scrapy
-import re
+
+from itemloaders import ItemLoader
+from itemloaders.processors import TakeFirst, MapCompose, Join
+
+from molodist.items import MolodistItem
 
 
 class ProductsSpider(scrapy.Spider):
@@ -8,19 +12,18 @@ class ProductsSpider(scrapy.Spider):
     start_urls = ["https://molodist.store/shop/"]
 
     def parse(self, response, *kwargs):
+        for number in range(1, 8):
+            next_page = f"https://molodist.store/shop/page-{number}"
+            yield response.follow(next_page, self.parse_full_link)
+
+    def parse_full_link(self, response):
         for link in response.css('div.product-image.scaleto a::attr(href)'):
             yield response.follow(link, self.parse_product)
 
-        for number in range(1, 8):
-            next_page = f"https://molodist.store/shop/page-{number}"
-            yield response.follow(next_page, self.parse)
-
     def parse_product(self, response, *kwargs):
-        price_numbers = re.findall('\d+', response.css('span.regular-price::text').get())
-        re_desc = re.sub("\s+", ' ', response.css('div.row.product-short-description-block p::text').get())
-        target = {
-            "title": response.css('div.products-title h1::text').get().strip(),
-            "price": "".join(price_numbers),
-            "description": "".join(re_desc)
-        }
-        yield target
+        loader = ItemLoader(item=MolodistItem(), selector=response)
+        loader.default_output_processor = TakeFirst()
+        loader.add_css("title", "div.products-title h1::text")
+        loader.add_css("price", 'span.regular-price::text', re='\d+')
+        loader.add_css("description", "div.row.product-short-description-block p::text")
+        yield loader.load_item()
