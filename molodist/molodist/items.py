@@ -4,10 +4,10 @@
 # https://docs.scrapy.org/en/latest/topics/items.html
 
 import scrapy
-
+from scrapy.loader.processors import Join, MapCompose
 
 class MolodistItem(scrapy.Item):
-    title = scrapy.Field()
-    price = scrapy.Field()
-    description = scrapy.Field()
+    title = scrapy.Field(input_processor=MapCompose(str.strip))
+    price = scrapy.Field(input_processor=Join(''))
+    description = scrapy.Field(input_processor=MapCompose(str.strip))
     pass
